@@ -14,7 +14,7 @@ import {
 } from "viem";
 import { useConfig, useConnection, useReadContracts, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
-import { errorMessage } from "./errors";
+import { errorMessage, isRpcError } from "./errors";
 import { timeLockAbi, timeLockAddresses } from "./timelock";
 import type { config } from "./wagmi";
 
@@ -60,7 +60,9 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
       { address: tokenAddress, abi: erc20Abi, functionName: "balanceOf", args: [account] },
       { address: tokenAddress, abi: erc20Abi, functionName: "allowance", args: [account, timeLock] },
     ],
-    query: { enabled: tokenAddress !== undefined },
+    // No retries: viem already retries failed RPC requests, and a contract that isn't an ERC20
+    // fails the same way every time.
+    query: { enabled: tokenAddress !== undefined, retry: false },
   });
   const info = token.data && {
     symbol: token.data[0],
@@ -86,7 +88,9 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
           ? "Looking up token…"
           : info
             ? `Balance: ${formatUnits(info.balance, info.decimals)} ${info.symbol}`
-            : `No ERC20 token found at this address on ${chain.name}.`;
+            : isRpcError(token.error)
+              ? `Couldn't look up this token: ${errorMessage(token.error)}`
+              : `No ERC20 token found at this address on ${chain.name}.`;
   const tokenInvalid = (tokenInput !== "" && !tokenAddress) || token.isError;
 
   const amountError =

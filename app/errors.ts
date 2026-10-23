@@ -1,7 +1,8 @@
 import { BaseError, HttpRequestError, RpcRequestError, TimeoutError } from "viem";
 
 // viem and wagmi errors put details and a version footer in `message`; `shortMessage` is the readable part.
-export function errorMessage(error: Error) {
+export function errorMessage(error: unknown) {
+  if (!(error instanceof Error)) return String(error);
   return "shortMessage" in error && typeof error.shortMessage === "string"
     ? error.shortMessage
     : error.message;

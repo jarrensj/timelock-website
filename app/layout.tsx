@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ConnectWallet } from "./connect-wallet";
 import "./globals.css";
+import { Nav } from "./nav";
 import { Providers } from "./providers";
 
 const geistSans = Geist({
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-screen flex-col">
         <Providers>
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 px-4 py-3 sm:px-6">
-            <span className="font-semibold">timelock</span>
+            <div className="flex items-center gap-6">
+              <span className="font-semibold">timelock</span>
+              <Nav />
+            </div>
             <ConnectWallet />
           </header>
           {children}

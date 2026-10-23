@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import {
   type Address,
   type Hash,
@@ -12,35 +13,21 @@ import {
   parseUnits,
   zeroAddress,
 } from "viem";
-import { useConfig, useConnection, useReadContracts, useWriteContract } from "wagmi";
-import { waitForTransactionReceipt } from "wagmi/actions";
+import { useReadContracts, useWriteContract } from "wagmi";
 import { errorMessage, isRpcError } from "./errors";
-import { timeLockAbi, timeLockAddresses } from "./timelock";
-import type { config } from "./wagmi";
-
-type Chain = (typeof config)["chains"][number];
+import { formatTime } from "./format";
+import { timeLockAbi } from "./timelock";
+import { TimeLockGate } from "./timelock-gate";
+import { waitForSuccess } from "./transactions";
+import type { Chain } from "./wagmi";
 
 export function Deposit() {
-  const { address, chain } = useConnection();
-  // wagmi starts reconnecting before the page hydrates, so render the server's disconnected
-  // state until it has, or hydration won't match.
-  const hydrated = useSyncExternalStore(subscribeToNothing, () => true, () => false);
-
-  if (!hydrated || !address) return <Notice>Connect a wallet to lock tokens.</Notice>;
-  if (!chain) return <Notice>Switch your wallet to Robinhood Chain to lock tokens.</Notice>;
-  const timeLock = timeLockAddresses[chain.id];
-  if (!timeLock) return <Notice>TimeLock isn&apos;t deployed on {chain.name} yet.</Notice>;
-
-  // Keyed so that switching account or network starts a fresh form.
-  return (
-    <DepositForm key={`${chain.id}:${address}`} account={address} chain={chain} timeLock={timeLock} />
-  );
+  return <TimeLockGate purpose="lock tokens">{(props) => <DepositForm {...props} />}</TimeLockGate>;
 }
 
 type Lock = { id: bigint; amount: string; symbol: string; unlockTime: bigint; hash: Hash };
 
 function DepositForm({ account, chain, timeLock }: { account: Address; chain: Chain; timeLock: Address }) {
-  const config = useConfig();
   const { mutateAsync: writeContract } = useWriteContract();
   const [tokenInput, setTokenInput] = useState("");
   const [amountInput, setAmountInput] = useState("");
@@ -124,7 +111,7 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
     try {
       if (needsApproval) {
         setStatus("approving");
-        await confirm(
+        await waitForSuccess(
           await writeContract({
             address: tokenAddress,
             abi: erc20Abi,
@@ -132,12 +119,13 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
             args: [timeLock, amount],
             chainId: chain.id,
           }),
+          chain.id,
         );
         await token.refetch();
       }
 
       setStatus("locking");
-      const receipt = await confirm(
+      const receipt = await waitForSuccess(
         await writeContract({
           address: timeLock,
           abi: timeLockAbi,
@@ -145,6 +133,7 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
           args: [tokenAddress, amount, unlockTime, withdrawer],
           chainId: chain.id,
         }),
+        chain.id,
       );
       // Only TimeLock's logs: the token's transferFrom runs first and could emit a look-alike event.
       const [deposited] = parseEventLogs({
@@ -163,7 +152,7 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
       setAmountInput("");
       token.refetch();
     } catch (e) {
-      setError(e instanceof Error ? errorMessage(e) : String(e));
+      setError(errorMessage(e));
     } finally {
       setStatus("idle");
     }
@@ -177,20 +166,17 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
     };
   }
 
-  async function confirm(hash: Hash) {
-    const receipt = await waitForTransactionReceipt(config, { hash, chainId: chain.id });
-    if (receipt.status === "reverted") throw new Error("The transaction reverted.");
-    return receipt;
-  }
-
   if (lock) {
     return (
       <div className="flex flex-col gap-4 rounded-2xl border border-foreground/15 p-5">
         <h2 className="font-semibold">Tokens locked</h2>
-        {/* TODO: link to the lock once there's a page for viewing and withdrawing locks. */}
         <p className="text-sm">
           Lock #{lock.id.toString()} holds {lock.amount} {lock.symbol} until{" "}
-          {formatTime(lock.unlockTime)}.
+          {formatTime(lock.unlockTime)}. It&apos;s listed under{" "}
+          <Link href="/locks" className="underline underline-offset-2">
+            Your locks
+          </Link>
+          .
         </p>
         <div className="flex gap-2 text-sm">
           <a
@@ -358,16 +344,6 @@ function Field({
   );
 }
 
-function subscribeToNothing() {
-  return () => {};
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-2xl border border-foreground/15 p-5 text-sm text-foreground/70">{children}</p>
-  );
-}
-
 // Parses a decimal string into token units, or undefined if it isn't a plain number with at most
 // `decimals` decimal places.
 function parseAmount(value: string, decimals: number) {
@@ -378,11 +354,4 @@ function parseAmount(value: string, decimals: number) {
 
 function isInFuture(unixSeconds: bigint) {
   return unixSeconds * BigInt(1000) > BigInt(Date.now());
-}
-
-function formatTime(unixSeconds: bigint) {
-  return new Date(Number(unixSeconds) * 1000).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 }

@@ -10,6 +10,7 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { errorMessage } from "./errors";
+import { shortAddress } from "./format";
 
 export function ConnectWallet() {
   const { address, chain } = useConnection();
@@ -114,7 +115,7 @@ function Connected({ address, chainId }: { address: Address; chainId: number | u
           popoverTarget="wallet-menu"
           className="rounded-full border border-foreground/15 px-3 py-1.5 font-mono hover:bg-foreground/5"
         >
-          {address.slice(0, 6)}…{address.slice(-4)}
+          {shortAddress(address)}
         </button>
       </div>
       {/* Unmounts on disconnect, which also closes it. */}

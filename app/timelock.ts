@@ -8,6 +8,7 @@ export const timeLockAbi = parseAbi([
   "function withdraw(uint256 lockId)",
   "function getLock(uint256 lockId) view returns ((address token, address depositor, address withdrawer, uint256 amount, uint256 unlockTime, bool withdrawn) lock)",
   "function lockCount() view returns (uint256)",
+  "function updateWithdrawer(uint256 lockId, address newWithdrawer)",
   "event Deposited(uint256 indexed lockId, address indexed token, address indexed withdrawer, address depositor, uint256 amount, uint256 unlockTime)",
   "error ZeroAmount()",
   "error NotERC20()",
@@ -16,6 +17,8 @@ export const timeLockAbi = parseAbi([
   "error NotWithdrawer()",
   "error StillLocked(uint256 unlockTime, uint256 currentTime)",
   "error AlreadyWithdrawn()",
+  "error NotDepositorOrWithdrawer()",
+  "error ZeroAddress()",
   "error TransferFailed()",
   "error Reentrancy()",
 ]);

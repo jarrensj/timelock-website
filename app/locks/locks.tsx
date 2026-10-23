@@ -10,12 +10,13 @@ import { timeLockAbi } from "../timelock";
 import { Notice, TimeLockGate } from "../timelock-gate";
 import { waitForSuccess } from "../transactions";
 import type { Chain } from "../wagmi";
+import { ChangeWithdrawer } from "./change-withdrawer";
 
 export function Locks() {
   return <TimeLockGate purpose="see your locks">{(props) => <LockList {...props} />}</TimeLockGate>;
 }
 
-type Lock = {
+export type Lock = {
   id: bigint;
   token: Address;
   depositor: Address;
@@ -107,7 +108,7 @@ function LockList({ account, chain, timeLock }: { account: Address; chain: Chain
           account={account}
           chain={chain}
           timeLock={timeLock}
-          onWithdrawn={() => all.refetch()}
+          onUpdated={() => all.refetch()}
         />
       ))}
     </ul>
@@ -127,7 +128,7 @@ function LockRow({
   account,
   chain,
   timeLock,
-  onWithdrawn,
+  onUpdated,
 }: {
   lock: Lock;
   token: Token;
@@ -135,14 +136,16 @@ function LockRow({
   account: Address;
   chain: Chain;
   timeLock: Address;
-  onWithdrawn: () => Promise<unknown>;
+  onUpdated: () => Promise<unknown>;
 }) {
   const { mutateAsync: writeContract } = useWriteContract();
   const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState<string>();
 
   const status = lock.withdrawn ? "Withdrawn" : unlocked ? "Unlocked" : "Locked";
-  const canWithdraw = isAddressEqual(lock.withdrawer, account) && status === "Unlocked";
+  const youWithdraw = isAddressEqual(lock.withdrawer, account);
+  const youDeposited = isAddressEqual(lock.depositor, account);
+  const canWithdraw = youWithdraw && status === "Unlocked";
 
   async function withdraw() {
     setError(undefined);
@@ -158,7 +161,7 @@ function LockRow({
         }),
         chain.id,
       );
-      await onWithdrawn();
+      await onUpdated();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -207,6 +210,12 @@ function LockRow({
         </dd>
       </dl>
 
+      {youWithdraw && !youDeposited && !lock.withdrawn && (
+        <p className="text-sm text-foreground/60">
+          The depositor can change the withdrawer until you withdraw.
+        </p>
+      )}
+
       {canWithdraw && (
         <button
           type="button"
@@ -224,6 +233,17 @@ function LockRow({
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
+      )}
+
+      {/* Every listed lock has you as its depositor or withdrawer, so you can change it. */}
+      {!lock.withdrawn && (
+        <ChangeWithdrawer
+          lock={lock}
+          account={account}
+          chain={chain}
+          timeLock={timeLock}
+          onChanged={onUpdated}
+        />
       )}
     </li>
   );

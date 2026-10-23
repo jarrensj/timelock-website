@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/", label: "Lock" },
   { href: "/locks", label: "Your locks" },
+  { href: "/tokens", label: "Token locks" },
 ];
 
 export function Nav() {

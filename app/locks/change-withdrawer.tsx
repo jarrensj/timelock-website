@@ -7,7 +7,7 @@ import { errorMessage } from "../errors";
 import { timeLockAbi } from "../timelock";
 import { waitForSuccess } from "../transactions";
 import type { Chain } from "../wagmi";
-import type { Lock } from "./locks";
+import type { Lock } from "./use-locks";
 
 // The depositor or the current withdrawer can change a lock's withdrawer until it's withdrawn.
 export function ChangeWithdrawer({

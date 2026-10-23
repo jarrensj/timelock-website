@@ -25,7 +25,7 @@ export function Deposit() {
   return <TimeLockGate purpose="lock tokens">{(props) => <DepositForm {...props} />}</TimeLockGate>;
 }
 
-type Lock = { id: bigint; amount: string; symbol: string; unlockTime: bigint; hash: Hash };
+type Lock = { id: bigint; token: Address; amount: string; symbol: string; unlockTime: bigint; hash: Hash };
 
 function DepositForm({ account, chain, timeLock }: { account: Address; chain: Chain; timeLock: Address }) {
   const { mutateAsync: writeContract } = useWriteContract();
@@ -144,6 +144,7 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
       // The event has the amount actually received, which is less than `amount` for fee-on-transfer tokens.
       setLock({
         id: deposited.args.lockId,
+        token: tokenAddress,
         amount: formatUnits(deposited.args.amount, info.decimals),
         symbol: info.symbol,
         unlockTime,
@@ -176,7 +177,11 @@ function DepositForm({ account, chain, timeLock }: { account: Address; chain: Ch
           <Link href="/locks" className="underline underline-offset-2">
             Your locks
           </Link>
-          .
+          , and anyone can see it on the{" "}
+          <Link href={`/tokens?chain=${chain.id}&token=${lock.token}`} className="underline underline-offset-2">
+            {lock.symbol} token locks
+          </Link>{" "}
+          page.
         </p>
         <div className="flex gap-2 text-sm">
           <a
